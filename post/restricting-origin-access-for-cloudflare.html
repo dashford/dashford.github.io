@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restricting Origin Access for Cloudflare - dashford.dev</title>
+    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+</head>
+<body>
+<header>
+    <nav>
+        <a href="/">Home</a>
+        <a href="/about">About</a>
+<!--        <a href="/cv">CV</a>-->
+        <a href="https://github.com/dashford">GitHub</a>
+    </nav>
+    <h1>dashford.dev</h1>
+    <p>SRE living in Dublin, Ireland</p>
+</header>
+
+<main>
+    <h2>Restricting Origin Access for Cloudflare</h2>
+    <h6>February 2024</h6>
+    <img src="../images/CF_logo_stacked_blktype.jpg" />
+
+    <p><a href="https://cloudflare.com">Cloudflare</a> is a well known and powerful proxy you can run in front of your website. You may already be
+        familiar with the little orange cloud meaning your site is behind their proxy. Essentially what this means is DNS queries
+        return Cloudflare IPs so connections from users go to Cloudflare before being passed to your origin.</p>
+
+    <p>If you've invested a lot of time creating and customising WAF rules, redirects, request transformations, etc. then it can
+        be essential that you're enforcing all traffic through Cloudflare. Often times in business scenarios Cloudflare sits in
+        front of a managed load balancer or even another CDN like CloudFront. These load balancers are often public leaving your
+        origin accessible without going past Cloudflare first, thereby bypassing any rules or security gates you have in the way.</p>
+
+    <p>In this post we'll discuss some ways you can protect your origins, allowing only access from Cloudflare.</p>
+
+    <h3>Authenticated Origin Pulls</h3>
+
+    <p>You may have already seen Cloudflare offer a solution to this issue in the form of <a href="https://developers.cloudflare.com/ssl/origin-configuration/authenticated-origin-pull/">Authenticated Origin Pulls</a>. This is
+    a powerful way of ensuring connections only come through Cloudflare but oftentimes isn't a practical way forward when using managed
+    services (e.g. CloudFront, ELBs, etc.) as your origin.</p>
+
+    <p>An alternative approach and one adopted at our workplace has been to use <a href="https://developers.cloudflare.com/fundamentals/basic-tasks/protect-your-origin-server/">HTTP header validation</a> which gives us enough reassurance
+    while being relatively easy to implement in our managed services.</p>
+
+    <h3>Implementing HTTP Header Validation</h3>
+
+    <p>For cost and legacy reasons our stack consists of <code>Cloudflare > CloudFront > ELB</code>. Both the CloudFront and ELB stages
+    need to have some form of validation in order to ensure the entire chain is secure.</p>
+
+    <p>To secure CloudFront we make use of Cloudflare's transform rules, specifically <a href="https://developers.cloudflare.com/rules/transform/request-header-modification/">
+    modifying request headers</a>. Here, we can add a header that will be used further downstream:</p>
+
+    <pre><code>Set static: cloudflare-origin-token = C7SyZgjZwiSOFyomcm3wyxVJz5vLljqOfk7eNcuWbsbWHX1gvNY7ro5Z1cKgvu2</code></pre>
+
+    <p>We can set this token to be used for specific hostnames or set for everything giving us some flexibility in handling different
+    tokens values or scenarios.</p>
+
+    <h4>CloudFront</h4>
+
+    <p>Now that we're setting a token to be used we can look in CloudFront and see how we can use this token to block non Cloudflare traffic.</p>
+
+    <p>CloudFront has a useful feature in the form of CloudFront Functions. These functions live at the edge of the CloudFront network and are
+    ideal for small validation tasks like ours. Importantly they allow manipulation of the headers.</p>
+
+    <p>These functions are written in JavaScript but can be pretty basic for our needs. An example below:</p>
+
+    <pre><code>function handler(event) {
+    var headers = event.request.headers;
+    var token = 'C7SyZgjZwiSOFyomcm3wyxVJz5vLljqOfk7eNcuWbsbWHX1gvNY7ro5Z1cKgvu2';
+
+    if (headers['cloudflare-origin-token']) {
+        if (headers['cloudflare-origin-token'].value === token) {
+            return event.request;
+        }
+    }
+
+    return {
+        statusCode: 401,
+        statusDescription: 'Unauthorized'
+    };
+}</code></pre>
+
+    <p>In our example here we're inspecting the headers and checking for the existence of the <code>cloudflare-origin-token</code> header. If
+    we find it, we compare it to our expected token value. If they match we return the request as normal otherwise we return a <code>401</code>.</p>
+
+    <h4>ELB</h4>
+
+    <p>At this stage, we have secured the chain as far as CloudFront but in our example the ELB behind CloudFront is still publicly addressable.
+    To get around this we can make use of AWS security groups and <a href="https://docs.aws.amazon.com/vpc/latest/userguide/working-with-aws-managed-prefix-lists.html">
+    managed prefix lists.</a></p>
+
+    <p>Managed prefix lists are managed by AWS so the maintenance burden of using them is very small. One of these lists contains the IP address
+    range of all of CloudFront's origin facing servers. Using this list we can apply a security group to our ELB only allowing access from this
+    list. Now, any requests directly to the ELB not coming through CloudFront will timeout.</p>
+
+    <h3>Wrap Up</h3>
+
+    <p>Hopefully this post has been informative in detailing the steps you can take to protect your managed origin services from non-Cloudflare
+    traffic. In this particular example it works well from a maintenance point of view. Rotating the header token is about the only routine
+    step that needs to be taken periodically.</p>
+
+    <p>If your situation is different this might offer some inspiration too. If Cloudflare is talking directly to an ELB or ALB you can still
+    replicate the functionality albeit with a slightly higher maintenance burden. Cloudflare publish a list of their IP addresses which could
+    be used in place of CloudFront's. Alternatively, an ALB can inspect the header directly which offers a nice simplification.</p>
+</main>
+
+<footer>
+    <p>
+        dashford.dev | <a href="https://github.com/dashford">GitHub</a> | <a href="https://www.linkedin.com/in/david-ashford-63a40b98/">LinkedIn</a> | <a href="https://askubuntu.com/users/220/david-ashford">Stack Overflow</a>
+    </p>
+</footer>
+</body>
+</html>

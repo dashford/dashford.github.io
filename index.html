@@ -3,21 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>dashford.dev</title>
+    <title>Home - dashford.dev</title>
     <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
 </head>
 <body>
 <header>
-    <h1>Hello, world</h1>
-    <p>Welcome to my website!</p>
+    <nav>
+        <a href="/">Home</a>
+        <a href="/about.html">About</a>
+<!--        <a href="/cv.html">CV</a>-->
+        <a href="https://github.com/dashford">GitHub</a>
+    </nav>
+    <h1>dashford.dev</h1>
+    <p>SRE living in Dublin, Ireland</p>
 </header>
 
 <main>
-    <p>This is my new website and it's using Simple.css. It's really cool. If you want to use it too, you can <a href="https://simplecss.org">visit their site</a>.</p>
+    <section>
+        <h2>Restricting Origin Access for Cloudflare</h2>
+        <h6>February 2024</h6>
+        <p><a href="https://cloudflare.com">Cloudflare</a> is a well known and powerful proxy you can run in front of your website. You may already be
+            familiar with the little orange cloud meaning your site is behind their proxy. Essentially what this means is DNS queries
+            return Cloudflare IPs so connections from users go to Cloudflare before being passed to your origin.</p>
+        <p><a class="button" href="/post/restricting-origin-access-for-cloudflare.html">Read more...</a></p>
+    </section>
 </main>
 
 <footer>
-    <p>dashford.dev</p>
+    <p>
+        dashford.dev | <a href="https://github.com/dashford">GitHub</a> | <a href="https://www.linkedin.com/in/david-ashford-63a40b98/">LinkedIn</a> | <a href="https://askubuntu.com/users/220/david-ashford">Stack Overflow</a>
+    </p>
 </footer>
 </body>
 </html>
